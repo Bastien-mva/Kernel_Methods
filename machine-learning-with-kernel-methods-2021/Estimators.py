@@ -154,7 +154,32 @@ def cross_val_split(Xtrain,ytrain, cv):
     return Xtrainsplit,Xvalsplit,ytrainsplit,yvalsplit
 
 
-
+def Kernel_cross_val_split(K_train,ytrain, cv):
+    idx = np.arange(K_train.shape[0])
+    np.random.shuffle(idx) # we shuffle the indices to get random samples
+    sample_size = K_train.shape[0]//cv
+    Kerneltrainsplit = []# a list that wil contain each Kernel_train vector. Each element will be smaller than 
+                    #K_train. If cv = 3 for example, the size (on the x axis) will be 2/3 the original size 
+    ytrainsplit = []
+    Kernelvalsplit = []
+    yvalsplit = []
+    for i in range(cv-1): 
+        #we add the new indices. Here, takes the original vector and returns the vector without the 
+        # indices passes in argument 
+        Kerneltrainsplit.append(np.delete(np.delete(K_train,idx[i*sample_size:(i+1)*sample_size],axis =                                                          0),idx[i*sample_size:(i+1)*sample_size],axis = 1))
+        ytrainsplit.append(np.delete(ytrain,idx[i*sample_size:(i+1)*sample_size],axis = 0))
+        
+        # we add the rest 
+        # note that here, we keep the same labels for X ( we do not shuffle independantly X and y)
+        Kernelvalsplit.append(np.delete(K_train,idx[i*sample_size:(i+1)*sample_size],axis = 0)[:,idx[i*sample_size:                                         (i+1)*sample_size]])
+        yvalsplit.append(ytrain[idx[i*sample_size:(i+1)*sample_size]])
+    # we add the last round. It is different since we can't take float proportion of an array, 
+    # we have to take an integer. So, here we just add what remains. 
+    Kerneltrainsplit.append(np.delete(np.delete(K_train,idx[(cv-1)*sample_size:],axis = 0), idx[(cv-                                                              1)*sample_size:], axis = 1))
+    ytrainsplit.append(np.delete(ytrain,idx[(cv-1)*sample_size:],axis = 0))
+    Kernelvalsplit.append(np.delete(K_train,idx[(cv-1)*sample_size:],axis = 0)[:,idx[(cv-1)*sample_size:]])
+    yvalsplit.append(ytrain[idx[(cv-1)*sample_size:]])
+    return Kerneltrainsplit,Kernelvalsplit,ytrainsplit,yvalsplit
 
 class estimator(): 
     def __init__(self , Kernel): 
@@ -174,17 +199,15 @@ class estimator():
         else : 
             prob = self.predict_proba(K_test)
             return prob>0.5
-    def cross_val(self, Xtrain,ytrain,cv): 
+    def cross_val(self, K_train,ytrain,cv): 
         mistake = 0
-        Xtrainsplit,Xvalsplit,ytrainsplit,yvalsplit = cross_val_split(Xtrain,ytrain,cv)
-        for xtrain,xval,ytrain,yval in tqdm(zip(Xtrainsplit,Xvalsplit, ytrainsplit, yvalsplit)):
-            kernel_train = to_Kernel_train(xtrain,self.Kernel)
-            self.fit(xtrain,ytrain)
-            kernel_val = to_Kernel_test(xtrain,xval,self.Kernel)
-            pred = self.predict(kernel_val)
+        Kerneltrainsplit,Kernelvalsplit,ytrainsplit,yvalsplit = Kernel_cross_val_split(K_train,ytrain,cv)
+        for Ktrain,Kval,ytrain,yval in tqdm(zip(Kerneltrainsplit,Kernelvalsplit, ytrainsplit, yvalsplit)):
+            self.fit(Ktrain,ytrain)
+            pred = self.predict(Kval)
             mistake+=np.sum(np.abs(pred-yval))
-        print('Pourcentage of errors : ', mistake/Xtrain.shape[0])
-        return mistake/Xtrain.shape[0]
+        print('Score : ',1- mistake/K_train.shape[0])
+        return mistake/K_train.shape[0]
     
     
     

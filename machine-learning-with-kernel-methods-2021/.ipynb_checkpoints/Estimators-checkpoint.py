@@ -207,7 +207,7 @@ class estimator():
             pred = self.predict(Kval)
             mistake+=np.sum(np.abs(pred-yval))
         print('Score : ',1- mistake/K_train.shape[0])
-        return mistake/K_train.shape[0]
+        return 1- mistake/K_train.shape[0]
     
     
     
@@ -222,7 +222,9 @@ class KRR(estimator):
         y_copy = (2*y-1).copy()
         self.Kernel_train = K_train
         self.alpha = fit_KRR(self.Kernel_train, self.lam, y_copy)
-
+    
+    def set_parameter(self, lam): 
+        self.lam = lam 
 
 
 

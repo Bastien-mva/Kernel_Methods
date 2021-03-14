@@ -229,7 +229,7 @@ def kernel_cluster_assignment(mat_K,clusters,K):# we actually don't need mu here
     #Initilialization
     new_clusters = np.empty(clusters.shape)
     #we loop over the clusters 
-    for i in range(mat_K.shape[0]):
+    for i in tqdm(range(mat_K.shape[0])):
         new_clusters[i] = np.argmin(compute_one_loss(mat_K,clusters,K,i)) # we compute the loss and then just take the argmin 
     return new_clusters
   
@@ -240,7 +240,7 @@ class KernelKmeans():
     
     def __init__(self): 
         pass 
-    def fit(self, mat_K, K,z= None, Niter_max = 10, viz = True): 
+    def fit(self, mat_K, K,z= None, Niter_max = 10, viz = True, true_label = None): 
         '''
         computes the Kernel Kmeans given the Kernel Matrix mat_K. 
         
@@ -265,15 +265,29 @@ class KernelKmeans():
         self.K = K
         self.mat_K = mat_K 
         self.best_coords = KPCA(self.mat_K, nb_components = 2) 
+        print('self;best_coords : ', self.best_coords)
         self.clusters = np.random.randint(0,high = K, size = self.mat_K.shape[0])
         if viz : 
             print('Initilisation : ')
-            self.best_coords = z # uncomment this if you want to visualize the vector without PCA 
+            #self.best_coords = z # uncomment this if you want to visualize the vector without PCA 
+            
             plt.scatter(self.best_coords[:,0],self.best_coords[:,1], c = self.clusters)
+            plt.title('predictions')
+            plt.legend()
+            plt.show()
+            plt.scatter(self.best_coords[:,0],self.best_coords[:,1], c = true_label)
+            plt.title('True_label')
+            plt.legend()
             plt.show()
         for i in range(Niter_max): 
-            self.clusters = kernel_cluster_assignment(self.mat_K,self.clusters,self.K)
+            self.clusters =kernel_cluster_assignment(self.mat_K,self.clusters,self.K)
+            
             if viz : 
                 print('Update : ')
                 plt.scatter(self.best_coords[:,0],self.best_coords[:,1], c = self.clusters)
-                plt.show()       
+                plt.show() 
+                plt.scatter(self.best_coords[:,0],self.best_coords[:,1], c = true_label)
+                plt.title('True_label')
+                plt.legend()
+                plt.show()
+        return self.clusters

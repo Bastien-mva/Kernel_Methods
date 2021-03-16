@@ -6,6 +6,10 @@ import numba
 from numba import njit,vectorize, jit
 import time
 import scipy
+import cvxopt
+import cvxopt.solvers
+
+cvxopt.solvers.options['show_progress'] = False
 
 
 #@njit
@@ -185,13 +189,14 @@ class estimator():
     def __init__(self , Kernel): 
         self.Kernel = Kernel
         self.Kernel_train = None 
-        self.alpha = None 
+        self.alpha = None
+        self.b = 0
         
     def predict_proba(self,Kernel_test): 
         if (self.alpha == None).any()==True  : 
             print("Il faut d'abord fitter les données")
         else : 
-            return  sigmoid(self.alpha@Kernel_test)
+            return  sigmoid(self.alpha@Kernel_test + self.b)
     
     def predict(self,K_test): 
         if (self.alpha == None).any()==True : 
@@ -199,6 +204,7 @@ class estimator():
         else : 
             prob = self.predict_proba(K_test)
             return prob>0.5
+        
     def cross_val(self, K_train,ytrain,cv): 
         mistake = 0
         Kerneltrainsplit,Kernelvalsplit,ytrainsplit,yvalsplit = Kernel_cross_val_split(K_train,ytrain,cv)
@@ -226,7 +232,78 @@ class KRR(estimator):
     def set_parameter(self, lam): 
         self.lam = lam 
 
+        
+class SVM(estimator):
+    def __init__(self, Kernel, C = 1):
+        self.kernel = Kernel
+        self.C = C
+        self.alpha = None
+        self.support_vectors = None
+        self.support_Y = None
+        
+    def fit(self, K, Y):
+        n = len(Y)
+        #calculate the kernel
+        #K = np.apply_along_axis(lambda x1: np.apply_along_axis( lambda x2 : self.kernel(x2, x1), 1, X), 1, X)
+    
+        lbd = 1
+        #C = 1 / (2 * n * lbd)  #ça dépend si on veut gérer C ou lambda
 
+        #take Y as -1 and 1
+        label = 2 * Y - 1
+        
+        
+        P = cvxopt.matrix(np.outer(label, label) * K ) 
+        q = cvxopt.matrix(-np.ones(n))
+        A = cvxopt.matrix(label, (1,n), 'd')
+        b = cvxopt.matrix(0.0)
+                
+        '''Je réécris l'inégalité : 0<=y_i*alpha_i<=C avec C = 1/(2*lambda*n)
+        comme: G*alpha<=h avec G=stack(diag(Y),-diag(Y)) et h= [C, ..., C, 0, ..., 0] (n fois C et n fois 0)
+        ça revient au même et je crois que le solver devrait fonctionner avec ça, mais j'y arrive pas encore
+        '''
+        # b <= C
+        G1 = np.eye(n)
+        h1 = np.ones(n) * self.C
+        
+        # -b <= 0
+        G2 = -np.eye(n)
+        h2 = np.zeros(n)
+        
+        G = cvxopt.matrix(np.vstack((G2, G1)))
+        h = cvxopt.matrix(np.hstack((h2, h1)))
+
+        #min_b 1/2 * b.T * diag(Y) * K * diag(Y) * b - b.T * 1 s.t. 0<= b <= C
+        solver = cvxopt.solvers.qp(P, q, G, h, A, b)
+        
+        self.beta = np.ravel(solver['x']) # le alpha ou on garde toutes les coordonnées 
+                                                # en comparaison avec le self.alpha ou en garde que quelques-uns 
+        
+        #Je retire les vecteurs avec un alpha trop petit
+        eps = 1e-5
+        supportIndices = np.abs(self.beta) < eps
+        ind = np.arange(n)[supportIndices]
+        
+        #self.support_vectors = X[supportIndices]
+        #self.support_Y = label[supportIndices]
+        #self.alpha = self.beta[supportIndices]  
+        #alpha : all_alpha sans les alpha < eps        
+        #print('We keep ', len(self.alpha), 'support vectors out of',len(self.all_alpha),'vectors')
+        
+        #Pour prédire avec classe estimator:
+        #self.X_train = X
+        self.alpha = self.beta*label
+        self.alpha[supportIndices] = np.zeros(n)[supportIndices]
+        
+        #Bias
+        self.b = 0
+        for i in range(n):
+            self.b = label[i]
+            self.b -= np.sum( self.alpha * K[i, :])
+        self.b /= n
+
+    def set_parameter(self,C): 
+        self.C = C 
 
 
 

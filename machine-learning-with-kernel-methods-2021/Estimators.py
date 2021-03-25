@@ -186,8 +186,7 @@ def Kernel_cross_val_split(K_train,ytrain, cv):
     return Kerneltrainsplit,Kernelvalsplit,ytrainsplit,yvalsplit
 
 class estimator(): 
-    def __init__(self , Kernel): 
-        self.Kernel = Kernel
+    def __init__(self): 
         self.Kernel_train = None 
         self.alpha = None
         self.b = 0
@@ -220,8 +219,8 @@ class estimator():
 
 #lam = 1e-8 est bien
 class KRR(estimator): 
-    def __init__(self , Kernel, lam = 1e-8): 
-        super(KRR, self).__init__(Kernel)
+    def __init__(self , Kernel = None, lam = 1e-8): 
+        super(KRR, self).__init__()
         self.lam = lam 
         
     def fit(self, K_train, y): 
